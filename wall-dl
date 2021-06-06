@@ -1,0 +1,35 @@
+#!/bin/sh
+
+# Clean up
+echo "cleaning up..."
+rm -r ~/.cache/wallhaven/*
+
+search=$(dmenu -p "wallhaven search" < /dev/null)
+touch ~/.cache/wallhaven/path
+
+fetch_thumbnail() {
+
+    json=$(wget -q -O - "https://wallhaven.cc/api/v1/search?q=$search&sorting=relevance&atleast=1920x1080")
+    echo "$json" | jq -r '.data[].path' > ~/.cache/wallhaven/path
+
+    echo "[+] fetching thumbnails..."
+    echo "$json" | jq -r '.data[].thumbs.large' | aria2c -q -d ~/.cache/wallhaven -i - # - in wget means read url from standard input. 
+
+}
+
+fetch_thumbnail 
+cd /home/aarnar/.cache/wallhaven
+ls *.jpg | sxiv -fiot -z 200 |awk -F. '{print $1}' > marked_wall	
+
+if [ -s marked_wall ]
+then
+    while read id
+    do
+	grep "$id" path >> downloads 
+    done < marked_wall
+
+    echo "[+] downloading wallpapers..."
+    aria2c -q -d ~/Wallpapers/wallhaven -i downloads
+    echo "[+] download complete..."
+fi
+
